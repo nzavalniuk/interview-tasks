@@ -1,24 +1,60 @@
-import React, { useState } from "react"
+import React, { useState } from "react";
 
-type CurrencyCode = "USD" | "EUR" | "UAH"
+type CurrencyCode = "USD" | "EUR" | "UAH";
 
 interface Currency {
-  code: CurrencyCode
-  name: string
+  code: CurrencyCode;
+  name: string;
 }
 
-export const API_BASE_URL = "http://localhost:8000"
+export const API_BASE_URL = "http://localhost:8000";
 
 const defaultCurrencies: Currency[] = [
   { code: "USD", name: "Долар США" },
   { code: "EUR", name: "Євро" },
   { code: "UAH", name: "Гривня" },
-]
+];
 
 const CurrencyConverter: React.FC = () => {
-  const [from, setFrom] = useState<CurrencyCode>("USD")
-  const [to, setTo] = useState<CurrencyCode>("UAH")
-  const [amount, setAmount] = useState<number>(1)
+  const [from, setFrom] = useState<CurrencyCode>("USD");
+  const [to, setTo] = useState<CurrencyCode>("UAH");
+  const [amount, setAmount] = useState<number>(1);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  function handleConvert() {
+    if (!amount || isNaN(+amount) || amount <= 0) {
+      setError("Некоректна сума");
+      return;
+    }
+
+    if (from === to) {
+      setResult(`${amount} ${from} = ${amount} ${to}`);
+      return;
+    }
+
+    setIsLoading(true);
+    fetch(
+      `${API_BASE_URL}/convert-currency?from=${from}&to=${to}&amount=${amount}`
+    )
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error("Не вдалося отримати дані");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        setResult(`${amount} ${from} = ${data.amount} ${to}`);
+      })
+      .catch(() => {
+        setResult("");
+        setError("Не вдалося отримати дані");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }
 
   return (
     <div
@@ -37,7 +73,10 @@ const CurrencyConverter: React.FC = () => {
           value={amount}
           min={0}
           step="any"
-          onChange={(e) => setAmount(Number(e.target.value))}
+          onChange={(e) => {
+            setAmount(Number(e.target.value));
+            setError(null);
+          }}
           style={{ width: "100%", marginBottom: 12, fontSize: 18, padding: 8 }}
         />
       </div>
@@ -66,8 +105,23 @@ const CurrencyConverter: React.FC = () => {
           ))}
         </select>
       </div>
+      <div>
+        {error && <p style={{ color: "red" }}>{error}</p>}
+        <button
+          style={{ width: "100%" }}
+          onClick={handleConvert}
+          disabled={isLoading}
+        >
+          {isLoading ? "Конвертування..." : "Конвертувати"}
+        </button>
+        <div style={{ margin: "1rem 0", height: 24 }}>
+          {!isLoading && result && (
+            <p style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{result}</p>
+          )}
+        </div>
+      </div>
     </div>
-  )
-}
+  );
+};
 
-export default CurrencyConverter
+export default CurrencyConverter;

@@ -1,10 +1,14 @@
 import express from "express";
 import cors from "cors";
 import axios from "axios";
-import { Currency } from "./types";
-import { getCurrencyRateToUAH } from "./utils/getCurrencyRateToUAH";
 import dotenv from "dotenv";
+import { getCurrencyRates } from "./utils/getCurrenciesRate";
+import dayjs from "dayjs";
+import { isQueryValid } from "./utils/isQueryValid";
 dotenv.config();
+
+let cachedCurrencyRates: Map<string, number> | null = null;
+let lastUpdate = dayjs().startOf("day");
 
 const createHTTPServer = () => {
   const app = express();
@@ -20,38 +24,37 @@ const createHTTPServer = () => {
     try {
       const { from, to, amount } = req.query as Record<string, string>;
 
-      if (!from || !to || !amount) {
-        res.status(400).json({ error: "Bad request" });
+      if (!isQueryValid(from, to, amount)) {
+        res.status(400).json({ error: "Invalid query parameters" });
         return;
       }
 
       const amountNumber = Number(amount);
 
-      if (isNaN(amountNumber)) {
-        res.status(400).json({
-          error:
-            "Invalid value of 'amount' parameter, it must be a string number",
-        });
+      if (from === to) {
+        res.json({ amount: amountNumber });
         return;
       }
 
-      const currencies = (await axios.get(process.env.BANK_API_URL!))
-        .data as Currency[];
+      // check if last update was more than 24 hours ago
+      const isUpdateNeeded = dayjs().startOf("day").isAfter(lastUpdate, "day");
 
-      const rateFromExchangeCurrencyToUAH = getCurrencyRateToUAH(
-        currencies,
-        from
-      );
+      // update cache every day at 00:00:00
+      if (!cachedCurrencyRates || isUpdateNeeded) {
+        const currencies = (await axios.get(process.env.BANK_API_URL!)).data;
+
+        cachedCurrencyRates = getCurrencyRates(currencies);
+        lastUpdate = dayjs().startOf("day");
+      }
+
+      const rateFromExchangeCurrencyToUAH = cachedCurrencyRates.get(from);
 
       if (!rateFromExchangeCurrencyToUAH && from !== "UAH") {
         res.status(400).json({ error: "Invalid value of 'from' parameter" });
         return;
       }
 
-      const rateFromUAHToExchangeCurrency = getCurrencyRateToUAH(
-        currencies,
-        to
-      );
+      const rateFromUAHToExchangeCurrency = cachedCurrencyRates.get(to);
 
       if (!rateFromUAHToExchangeCurrency && to !== "UAH") {
         res.status(400).json({ error: "Invalid value of 'to' parameter" });

@@ -30,7 +30,7 @@ const CurrencyConverter: React.FC = () => {
     }
 
     if (from === to) {
-      setResult(`${amount} ${from} = ${amount} ${to}`);
+      setResult(`${amount.toFixed(2)} ${from} = ${amount} ${to}`);
       return;
     }
 
@@ -45,7 +45,7 @@ const CurrencyConverter: React.FC = () => {
         return res.json();
       })
       .then((data) => {
-        setResult(`${amount} ${from} = ${data.amount} ${to}`);
+        setResult(`${amount.toFixed(2)} ${from} = ${data.amount} ${to}`);
       })
       .catch(() => {
         setResult("");

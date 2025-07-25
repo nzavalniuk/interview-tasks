@@ -1,12 +1,12 @@
 import express from "express";
 import cors from "cors";
 import axios from "axios";
-import dotenv from "dotenv";
 import { getCurrencyRates } from "./utils/getCurrenciesRate";
 import dayjs from "dayjs";
 import { isQueryValid } from "./utils/isQueryValid";
-dotenv.config();
 
+const BANK_API_URL =
+  "https://bank.gov.ua/NBUStatService/v1/statdirectory/exchangenew?json";
 let cachedCurrencyRates: Map<string, number> | null = null;
 let lastUpdate = dayjs().startOf("day");
 
@@ -41,7 +41,7 @@ const createHTTPServer = () => {
 
       // update cache every day at 00:00:00
       if (!cachedCurrencyRates || isUpdateNeeded) {
-        const currencies = (await axios.get(process.env.BANK_API_URL!)).data;
+        const currencies = (await axios.get(BANK_API_URL)).data;
 
         cachedCurrencyRates = getCurrencyRates(currencies);
         lastUpdate = dayjs().startOf("day");
@@ -62,29 +62,25 @@ const createHTTPServer = () => {
       }
 
       if (from === "UAH") {
-        const convertedAmount = Number(
-          (amountNumber / rateFromUAHToExchangeCurrency!).toFixed(2)
-        );
+        const convertedAmount = amountNumber / rateFromUAHToExchangeCurrency!;
 
-        res.json({ amount: convertedAmount });
+        res.json({ amount: convertedAmount.toFixed(2) });
         return;
       }
 
       if (to === "UAH") {
-        const convertedAmount = Number(
-          (amountNumber * rateFromExchangeCurrencyToUAH!).toFixed(2)
-        );
+        const convertedAmount = amountNumber * rateFromExchangeCurrencyToUAH!;
 
-        res.json({ amount: convertedAmount });
+        res.json({ amount: convertedAmount.toFixed(2) });
         return;
       }
 
       const currencyRatio =
         rateFromExchangeCurrencyToUAH! / rateFromUAHToExchangeCurrency!;
 
-      const convertedAmount = Number((amountNumber * currencyRatio).toFixed(2));
+      const convertedAmount = amountNumber * currencyRatio;
 
-      res.json({ amount: convertedAmount });
+      res.json({ amount: convertedAmount.toFixed(2) });
     } catch (err) {
       res.status(500).json({ error: "Internal server error" });
       return;
